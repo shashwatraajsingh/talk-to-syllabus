@@ -4,8 +4,8 @@ An AI-powered RAG (Retrieval Augmented Generation) system that lets students cha
 
 ## 🚀 Tech Stack
 
-- **Frontend**: React + Vite
-- **Backend**: Node.js + Express
+- **Frontend**: React + Vite (`client/`)
+- **Backend**: Node.js + Express (`server/`)
 - **Database**: Supabase (PostgreSQL)
 - **Auth**: Supabase Auth
 - **Vector DB**: Pinecone
@@ -31,7 +31,10 @@ cd talk-to-syllabus
 ### 2. Install Dependencies
 
 ```bash
-npm install
+# Backend
+cd server && npm install && cd ..
+
+# Frontend
 cd client && npm install && cd ..
 ```
 
@@ -50,7 +53,7 @@ cd client && npm install && cd ..
 
 ### 5. Environment Variables
 
-Create `.env` in the root:
+Create `server/.env`:
 
 ```env
 # Server
@@ -86,12 +89,14 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ### 6. Initialize Database
 
 ```bash
-npm run setup
+cd server && npm run setup && cd ..
 ```
 
 This creates the required tables in your Supabase database.
 
 ### 7. Run the Application
+
+From the project root:
 
 ```bash
 bash start_all.sh
@@ -101,15 +106,40 @@ Or manually:
 
 ```bash
 # Terminal 1 - Backend
-npm run dev:server
+cd server && npm run dev:server
 
 # Terminal 2 - Frontend
-npm run dev:client
+cd client && npm run dev
 ```
 
 Access the app at **http://localhost:5173**
 
 ## 🏗️ Architecture
+
+### Project Structure
+
+```
+talk-to-syllabus/
+├── client/                 # React frontend
+│   ├── src/
+│   │   ├── components/    # UI components
+│   │   ├── pages/        # Route pages
+│   │   ├── context/      # Auth context
+│   │   └── utils/        # API client, Supabase
+│   ├── .env.example
+│   └── index.css         # AI-Native UI styles
+├── server/                # Node.js backend
+│   ├── src/
+│   │   ├── config/       # DB and Supabase setup
+│   │   ├── middleware/   # Auth middleware
+│   │   ├── routes/       # API routes
+│   │   └── services/     # PDF, RAG, Pinecone
+│   ├── .env.example
+│   ├── package.json
+│   └── setup_postgres.js # DB initialization
+├── start_all.sh           # Launch script
+└── README.md
+```
 
 ### Database Schema (Supabase PostgreSQL)
 
@@ -133,35 +163,15 @@ Access the app at **http://localhost:5173**
 4. **Query**: User asks question → Embed query → Search Pinecone
 5. **Generation**: Relevant chunks + history → Gemini → Response
 
-## 📁 Project Structure
-
-```
-talk-to-syllabus/
-├── client/                 # React frontend
-│   ├── src/
-│   │   ├── components/    # UI components
-│   │   ├── pages/        # Route pages
-│   │   ├── context/      # Auth context
-│   │   └── utils/        # API client, Supabase
-│   └── index.css         # AI-Native UI styles
-├── src/                   # Node.js backend
-│   ├── config/           # DB and Supabase setup
-│   ├── middleware/       # Auth middleware
-│   ├── routes/           # API routes
-│   └── services/         # PDF, RAG, Pinecone
-├── setup_postgres.js     # DB initialization
-└── start_all.sh          # Launch script
-```
-
 ## 🎨 Features
 
-✅ **Supabase Auth** - Secure authentication
-✅ **PDF Processing** - Extract and chunk documents
-✅ **Vector Search** - Semantic search via Pinecone
-✅ **RAG Chat** - Context-aware AI responses
-✅ **Document Management** - Upload, delete, share
-✅ **Modern UI** - AI-Native design with purple/cyan theme
-✅ **Chat History** - Persistent conversations
+✅ **Supabase Auth** - Secure authentication  
+✅ **PDF Processing** - Extract and chunk documents  
+✅ **Vector Search** - Semantic search via Pinecone  
+✅ **RAG Chat** - Context-aware AI responses  
+✅ **Document Management** - Upload, delete, share  
+✅ **Modern UI** - AI-Native design with purple/cyan theme  
+✅ **Chat History** - Persistent conversations  
 
 ## 🔒 Security
 

@@ -3,6 +3,8 @@
 # Stop on errors
 set -e
 
+cd server
+
 # Check if Supabase URL is configured
 if [ -z "$DATABASE_URL" ]; then
     echo "⚠️  DATABASE_URL not set in .env file"
@@ -18,15 +20,19 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+cd ..
+
 # Start Backend (background)
 echo "🚀 Starting Backend Server..."
-npm run dev:server &
+cd server && npm run dev:server &
 BACKEND_PID=$!
+cd ..
 
 # Start Frontend (background)
 echo "🎨 Starting Frontend Client..."
-npm run dev:client &
+cd client && npm run dev &
 FRONTEND_PID=$!
+cd ..
 
 echo ""
 echo "✅ All services started!"
