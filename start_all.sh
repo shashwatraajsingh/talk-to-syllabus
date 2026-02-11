@@ -3,36 +3,42 @@
 # Stop on errors
 set -e
 
-cd server
+# Load environment variables from server/.env
+if [ -f "server/.env" ]; then
+    export $(cat server/.env | grep -v '^#' | xargs)
+else
+    echo "⚠️  server/.env file not found!"
+    echo "   Please copy your .env file to the server/ directory"
+    echo "   Run: cp .env server/.env"
+    exit 1
+fi
 
 # Check if Supabase URL is configured
 if [ -z "$DATABASE_URL" ]; then
-    echo "⚠️  DATABASE_URL not set in .env file"
+    echo "⚠️  DATABASE_URL not set in server/.env file"
     echo "   Please configure your Supabase connection string"
     exit 1
 fi
 
 # Run Setup
 echo "📦 Running database setup (Supabase PostgreSQL)..."
+cd server
 node setup_postgres.js
 if [ $? -ne 0 ]; then
     echo "❌ Database setup failed. Please check your Supabase credentials."
     exit 1
 fi
-
 cd ..
 
 # Start Backend (background)
 echo "🚀 Starting Backend Server..."
-cd server && npm run dev:server &
+(cd server && npm run dev:server) &
 BACKEND_PID=$!
-cd ..
 
 # Start Frontend (background)
 echo "🎨 Starting Frontend Client..."
-cd client && npm run dev &
+(cd client && npm run dev) &
 FRONTEND_PID=$!
-cd ..
 
 echo ""
 echo "✅ All services started!"
