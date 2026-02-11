@@ -1,39 +1,48 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
 require('dotenv').config();
 
-const pinecone = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-});
+// Make Pinecone optional - don't crash if API key is missing
+let index = null;
 
-const index = pinecone.index(process.env.PINECONE_INDEX || 'talk-to-syllabus');
+if (process.env.PINECONE_API_KEY) {
+    try {
+        const pinecone = new Pinecone({
+            apiKey: process.env.PINECONE_API_KEY,
+        });
+        index = pinecone.index(process.env.PINECONE_INDEX || 'talk-to-syllabus');
+        console.log('✅ Pinecone connected');
+    } catch (error) {
+        console.warn('⚠️  Pinecone initialization failed:', error.message);
+    }
+} else {
+    console.warn('⚠️  PINECONE_API_KEY not set — Pinecone disabled (using direct PDF context instead)');
+}
 
 /**
- * Upsert embeddings into Pinecone (v7 API)
- * @param {Array<Object>} vectors - Array of { id, values, metadata }
+ * Upsert embeddings into Pinecone
  */
 async function upsertVectors(vectors) {
+    if (!index) {
+        console.warn('⚠️  Pinecone not available, skipping upsert');
+        return;
+    }
     try {
-        console.log(`  Debug: Upserting ${vectors.length} vectors to Pinecone`);
-
-        // Pinecone v7 expects just an array of vectors
-        const result = await index.namespace('').upsert(vectors);
-
+        await index.namespace('').upsert(vectors);
         console.log(`✅ Upserted ${vectors.length} vectors to Pinecone.`);
-        return result;
     } catch (error) {
-        console.error('❌ Pinecone Upsert Error:', error);
-        console.error('  Vector sample:', JSON.stringify(vectors[0], null, 2).slice(0, 300));
+        console.error('❌ Pinecone Upsert Error:', error.message);
         throw error;
     }
 }
 
 /**
  * Query Pinecone for similar vectors
- * @param {Array<number>} vector - Query embedding
- * @param {Object} filter - Metadata filter (e.g., { document_id: "xyz" })
- * @param {number} topK - Number of results to return
  */
 async function queryVectors(vector, filter, topK = 5) {
+    if (!index) {
+        console.warn('⚠️  Pinecone not available, returning empty results');
+        return [];
+    }
     try {
         const queryResponse = await index.namespace('').query({
             vector,
@@ -43,21 +52,21 @@ async function queryVectors(vector, filter, topK = 5) {
         });
         return queryResponse.matches;
     } catch (error) {
-        console.error('❌ Pinecone Query Error:', error);
-        throw error;
+        console.error('❌ Pinecone Query Error:', error.message);
+        return [];
     }
 }
 
 /**
- * Delete vectors by document ID prefix
+ * Delete vectors by document ID
  */
 async function deleteVectors(documentId) {
+    if (!index) return;
     try {
-        // Pinecone delete by metadata filter
         await index.namespace('').deleteMany({ filter: { document_id: { $eq: documentId } } });
         console.log(`🗑️ Deleted vectors for document ${documentId}`);
     } catch (error) {
-        console.error('❌ Pinecone Delete Error:', error);
+        console.error('❌ Pinecone Delete Error:', error.message);
     }
 }
 

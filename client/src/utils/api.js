@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+    ? `${import.meta.env.VITE_API_BASE_URL}/api`
+    : '/api';
 
 async function getHeaders() {
     // Get current Supabase session token
