@@ -1,17 +1,20 @@
 #!/bin/bash
 
-# Check if MySQL is running
-if ! pgrep -x "mysqld" > /dev/null; then
-    echo "⚠️  MySQL does not seem to be connected or running."
-    echo "   Ensure MySQL server is up: sudo systemctl start mysql"
-    echo "   Continuing anyway..."
+# Stop on errors
+set -e
+
+# Check if Supabase URL is configured
+if [ -z "$DATABASE_URL" ]; then
+    echo "⚠️  DATABASE_URL not set in .env file"
+    echo "   Please configure your Supabase connection string"
+    exit 1
 fi
 
 # Run Setup
-echo "📦 Running database setup (MySQL)..."
-node setup_mysql.js
+echo "📦 Running database setup (Supabase PostgreSQL)..."
+node setup_postgres.js
 if [ $? -ne 0 ]; then
-    echo "❌ Database setup failed. Please check your .env credentials."
+    echo "❌ Database setup failed. Please check your Supabase credentials."
     exit 1
 fi
 
@@ -20,9 +23,20 @@ echo "🚀 Starting Backend Server..."
 npm run dev:server &
 BACKEND_PID=$!
 
-# Start Frontend (foreground)
+# Start Frontend (background)
 echo "🎨 Starting Frontend Client..."
-npm run dev:client
+npm run dev:client &
+FRONTEND_PID=$!
 
-# Cleanup on exit
-trap "kill $BACKEND_PID" EXIT
+echo ""
+echo "✅ All services started!"
+echo "   Backend: http://localhost:3000"
+echo "   Frontend: http://localhost:5173"
+echo ""
+echo "Press Ctrl+C to stop all services."
+
+# Trap EXIT to kill background processes
+trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null; exit" EXIT INT TERM
+
+# Wait for processes
+wait

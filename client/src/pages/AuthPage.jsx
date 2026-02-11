@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { login as apiLogin, register as apiRegister } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, Mail, Lock, User, Building, BookOpen, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { GraduationCap, Mail, Lock, User } from 'lucide-react';
 
 export default function AuthPage() {
-    const { loginUser } = useAuth();
+    const { signIn, signUp } = useAuth();
+    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -13,9 +14,6 @@ export default function AuthPage() {
         email: '',
         password: '',
         fullName: '',
-        university: '',
-        department: '',
-        enrollmentYear: '',
     });
 
     const handleChange = (e) => {
@@ -29,13 +27,17 @@ export default function AuthPage() {
         setError('');
 
         try {
-            let result;
             if (isLogin) {
-                result = await apiLogin(form.email, form.password);
+                const { error } = await signIn(form.email, form.password);
+                if (error) throw error;
+                navigate('/');
             } else {
-                result = await apiRegister(form);
+                const { error } = await signUp(form.email, form.password, {
+                    full_name: form.fullName,
+                });
+                if (error) throw error;
+                setError('Check your email for the confirmation link!');
             }
-            loginUser(result.token, result.user);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -114,65 +116,16 @@ export default function AuthPage() {
                         </div>
                     </div>
 
-                    {!isLogin && (
-                        <>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label className="form-label" htmlFor="university">University</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <Building size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                        <input
-                                            id="university"
-                                            className="form-input"
-                                            style={{ paddingLeft: 36 }}
-                                            type="text"
-                                            name="university"
-                                            placeholder="MIT"
-                                            value={form.university}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label" htmlFor="department">Department</label>
-                                    <div style={{ position: 'relative' }}>
-                                        <BookOpen size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                        <input
-                                            id="department"
-                                            className="form-input"
-                                            style={{ paddingLeft: 36 }}
-                                            type="text"
-                                            name="department"
-                                            placeholder="Computer Science"
-                                            value={form.department}
-                                            onChange={handleChange}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    <button
-                        type="submit"
-                        className="auth-submit"
-                        disabled={loading}
-                    >
-                        {loading ? 'Please wait...' : (
-                            <>
-                                {isLogin ? 'Sign In' : 'Create Account'}
-                                <ArrowRight size={16} style={{ marginLeft: 8, display: 'inline' }} />
-                            </>
-                        )}
+                    <button type="submit" className="auth-submit" disabled={loading}>
+                        {loading ? 'Please wait...' : isLogin ? 'Sign In' : 'Create Account'}
                     </button>
                 </form>
 
                 <div className="auth-switch">
-                    {isLogin ? (
-                        <>Don&apos;t have an account? <a onClick={() => { setIsLogin(false); setError(''); }}>Sign Up</a></>
-                    ) : (
-                        <>Already have an account? <a onClick={() => { setIsLogin(true); setError(''); }}>Sign In</a></>
-                    )}
+                    {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                    <a onClick={() => { setIsLogin(!isLogin); setError(''); }}>
+                        {isLogin ? 'Sign Up' : 'Sign In'}
+                    </a>
                 </div>
             </div>
         </div>

@@ -1,40 +1,38 @@
-const jwt = require('jsonwebtoken');
-const { query } = require('../config/database');
+const supabase = require('../config/supabase');
 
-const authenticate = async (req, res, next) => {
+/**
+ * Middleware to verify Supabase JWT token
+ * Attaches user data to req.user
+ */
+async function authenticateToken(req, res, next) {
     try {
         const authHeader = req.headers.authorization;
+
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Access denied. No token provided.' });
+            return res.status(401).json({ error: 'No token provided' });
         }
 
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const token = authHeader.substring(7);
 
-        // Fetch user from DB
-        const [rows] = await query(
-            'SELECT id, email, full_name, university, department, is_active FROM users WHERE id = ?',
-            [decoded.userId]
-        );
+        // Verify token with Supabase
+        const { data: { user }, error } = await supabase.auth.getUser(token);
 
-        if (rows.length === 0) {
-            return res.status(401).json({ error: 'Invalid token. User not found.' });
+        if (error || !user) {
+            return res.status(401).json({ error: 'Invalid or expired token' });
         }
 
-        const user = rows[0];
+        // Attach user to request
+        req.user = {
+            id: user.id,
+            email: user.email,
+            ...user.user_metadata
+        };
 
-        if (!user.is_active) {
-            return res.status(403).json({ error: 'Account is deactivated.' });
-        }
-
-        req.user = user;
         next();
-    } catch (err) {
-        if (err.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Token has expired.' });
-        }
-        return res.status(401).json({ error: 'Invalid token.' });
+    } catch (error) {
+        console.error('Auth error:', error);
+        return res.status(401).json({ error: 'Authentication failed' });
     }
-};
+}
 
-module.exports = { authenticate };
+module.exports = { authenticateToken };

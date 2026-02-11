@@ -1,26 +1,22 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 require('dotenv').config();
 
-// Create connection pool
-const pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'talk_to_syllabus',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
+// Supabase PostgreSQL connection pool
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Required for Supabase
+    }
 });
 
-/**
- * Helper to run a query with prepared statements
- * Usage: const [rows] = await query('SELECT * FROM users WHERE id = ?', [1]);
- */
-const query = (sql, params) => pool.execute(sql, params);
+// Test connection
+pool.on('connect', () => {
+    console.log('✅ Connected to Supabase PostgreSQL');
+});
 
-/**
- * Get a connection from the pool for transactions
- */
-const getConnection = () => pool.getConnection();
+pool.on('error', (err) => {
+    console.error('❌ Unexpected PostgreSQL error:', err);
+    process.exit(-1);
+});
 
-module.exports = { pool, query, getConnection };
+module.exports = pool;

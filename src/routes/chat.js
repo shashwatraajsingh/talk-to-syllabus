@@ -1,7 +1,6 @@
 const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-const { query } = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const { retrieveRelevantChunks, generateRAGResponse } = require('../services/rag');
 
 const router = express.Router();
@@ -9,30 +8,28 @@ const router = express.Router();
 /**
  * POST /api/chat/sessions
  */
-router.post('/sessions', authenticate, async (req, res) => {
+router.post('/sessions', authenticateToken, async (req, res) => {
     try {
         const { title, documentId } = req.body;
 
         // Optional document check
         if (documentId) {
-            const [rows] = await query(
+            const result = await pool.query(
                 `SELECT id FROM documents 
-         WHERE id = ? AND is_deleted = FALSE
-           AND (uploaded_by = ? OR id IN (SELECT document_id FROM document_shares WHERE shared_with = ?))`,
-                [documentId, req.user.id, req.user.id]
+         WHERE id = $1 AND is_deleted = FALSE
+           AND (user_id = $2 OR id IN (SELECT document_id FROM document_shares WHERE shared_with = $2))`,
+                [documentId, req.user.id]
             );
-            if (rows.length === 0) return res.status(404).json({ error: 'Document not found or access denied.' });
+            if (result.rows.length === 0) return res.status(404).json({ error: 'Document not found or access denied.' });
         }
 
-        const sessionId = uuidv4();
-        await query(
-            `INSERT INTO chat_sessions (id, user_id, title, document_id) VALUES (?, ?, ?, ?)`,
-            [sessionId, req.user.id, title || 'New Chat', documentId || null]
+        const result = await pool.query(
+            `INSERT INTO chat_sessions (user_id, title, document_id) 
+             VALUES ($1, $2, $3) RETURNING *`,
+            [req.user.id, title || 'New Chat', documentId || null]
         );
 
-        // Return session
-        const [created] = await query('SELECT * FROM chat_sessions WHERE id = ?', [sessionId]);
-        res.status(201).json({ session: created[0] });
+        res.status(201).json({ session: result.rows[0] });
 
     } catch (error) {
         console.error('Create session error:', error);
@@ -43,18 +40,18 @@ router.post('/sessions', authenticate, async (req, res) => {
 /**
  * GET /api/chat/sessions
  */
-router.get('/sessions', authenticate, async (req, res) => {
+router.get('/sessions', authenticateToken, async (req, res) => {
     try {
-        const [rows] = await query(
+        const result = await pool.query(
             `SELECT cs.id, cs.title, cs.document_id, cs.message_count, cs.last_message_at, cs.created_at,
               d.title as document_title, d.course_name
        FROM chat_sessions cs
        LEFT JOIN documents d ON d.id = cs.document_id
-       WHERE cs.user_id = ? AND cs.is_active = TRUE
+       WHERE cs.user_id = $1 AND cs.is_active = TRUE
        ORDER BY COALESCE(cs.last_message_at, cs.created_at) DESC`,
             [req.user.id]
         );
-        res.json({ sessions: rows });
+        res.json({ sessions: result.rows });
     } catch (error) {
         console.error('List sessions error:', error);
         res.status(500).json({ error: 'Failed to fetch sessions.' });
@@ -64,30 +61,23 @@ router.get('/sessions', authenticate, async (req, res) => {
 /**
  * GET /api/chat/sessions/:sessionId/messages
  */
-router.get('/sessions/:sessionId/messages', authenticate, async (req, res) => {
+router.get('/sessions/:sessionId/messages', authenticateToken, async (req, res) => {
     try {
         // Verify session ownership
-        const [session] = await query('SELECT id FROM chat_sessions WHERE id = ? AND user_id = ?', [req.params.sessionId, req.user.id]);
-        if (session.length === 0) return res.status(404).json({ error: 'Chat session not found.' });
+        const session = await pool.query('SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2', [req.params.sessionId, req.user.id]);
+        if (session.rows.length === 0) return res.status(404).json({ error: 'Chat session not found.' });
 
-        const [rows] = await query(
+        const result = await pool.query(
             `SELECT id, role, content, retrieved_chunk_ids, model_used, 
               prompt_tokens, completion_tokens, total_tokens,
               feedback_rating, created_at
        FROM chat_messages
-       WHERE session_id = ?
+       WHERE session_id = $1
        ORDER BY created_at ASC`,
             [req.params.sessionId]
         );
 
-        res.json({
-            messages: rows.map(msg => ({
-                ...msg,
-                retrieved_chunk_ids: typeof msg.retrieved_chunk_ids === 'string'
-                    ? JSON.parse(msg.retrieved_chunk_ids)
-                    : msg.retrieved_chunk_ids
-            }))
-        });
+        res.json({ messages: result.rows });
     } catch (error) {
         console.error('Get messages error:', error);
         res.status(500).json({ error: 'Failed to fetch messages.' });
@@ -98,47 +88,45 @@ router.get('/sessions/:sessionId/messages', authenticate, async (req, res) => {
  * POST /api/chat/sessions/:sessionId/messages
  * RAG Pipeline: User Msg -> Pinecone Search -> Gemini -> AI Msg
  */
-router.post('/sessions/:sessionId/messages', authenticate, async (req, res) => {
+router.post('/sessions/:sessionId/messages', authenticateToken, async (req, res) => {
     try {
         const { content } = req.body;
         if (!content || !content.trim()) return res.status(400).json({ error: 'Message content is required.' });
 
         // 1. Validate session
-        const [sessions] = await query('SELECT id, document_id FROM chat_sessions WHERE id = ? AND user_id = ?', [req.params.sessionId, req.user.id]);
-        if (sessions.length === 0) return res.status(404).json({ error: 'Chat session not found.' });
-        const session = sessions[0];
+        const sessions = await pool.query('SELECT id, document_id FROM chat_sessions WHERE id = $1 AND user_id = $2', [req.params.sessionId, req.user.id]);
+        if (sessions.rows.length === 0) return res.status(404).json({ error: 'Chat session not found.' });
+        const session = sessions.rows[0];
 
         // 2. Save user message
-        const [contentRes] = await query(
-            `INSERT INTO chat_messages (id, session_id, role, content) VALUES (?, ?, 'user', ?)`,
-            [uuidv4(), session.id, content]
+        await pool.query(
+            `INSERT INTO chat_messages (session_id, role, content) VALUES ($1, 'user', $2)`,
+            [session.id, content]
         );
 
         // 3. RAG Retrieval (Pinecone)
         const retrievedChunks = await retrieveRelevantChunks(content, session.document_id, 5);
-        const chunkIds = retrievedChunks.map(c => c.id); // Pinecone vector IDs
+        const chunkIds = retrievedChunks.map(c => c.id);
 
         // 4. Get chat history
-        const [historyRows] = await query(
-            `SELECT role, content FROM chat_messages WHERE session_id = ? ORDER BY created_at DESC LIMIT 10`,
+        const historyRows = await pool.query(
+            `SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at DESC LIMIT 10`,
             [session.id]
         );
-        const chatHistory = historyRows.reverse();
+        const chatHistory = historyRows.rows.reverse();
 
         // 5. Generate AI Response
         const aiResponse = await generateRAGResponse(content, retrievedChunks, chatHistory);
 
         // 6. Save AI message
-        const aiMsgId = uuidv4();
-        await query(
+        const aiMsg = await pool.query(
             `INSERT INTO chat_messages 
-       (id, session_id, role, content, retrieved_chunk_ids, model_used, prompt_tokens, completion_tokens, total_tokens)
-       VALUES (?, ?, 'assistant', ?, ?, ?, ?, ?, ?)`,
+       (session_id, role, content, retrieved_chunk_ids, model_used, prompt_tokens, completion_tokens, total_tokens)
+       VALUES ($1, 'assistant', $2, $3, $4, $5, $6, $7) RETURNING *`,
             [
-                aiMsgId,
                 session.id,
                 aiResponse.content,
-                JSON.stringify(chunkIds), // Store as JSON string in MySQL
+                JSON.stringify(chunkIds),
                 aiResponse.model,
                 aiResponse.promptTokens,
                 aiResponse.completionTokens,
@@ -147,15 +135,12 @@ router.post('/sessions/:sessionId/messages', authenticate, async (req, res) => {
         );
 
         // 7. Update session stats
-        await query(
+        await pool.query(
             `UPDATE chat_sessions 
        SET message_count = message_count + 2, last_message_at = NOW() 
-       WHERE id = ?`,
+       WHERE id = $1`,
             [session.id]
         );
-
-        // 8. Update user active count
-        await query('UPDATE users SET total_queries = total_queries + 1 WHERE id = ?', [req.user.id]);
 
         // Return response
         const sources = retrievedChunks.map(chunk => ({
@@ -163,16 +148,11 @@ router.post('/sessions/:sessionId/messages', authenticate, async (req, res) => {
             courseName: chunk.course_name,
             pageNumber: chunk.page_number,
             similarity: chunk.similarity?.toFixed(3),
-            preview: chunk.chunk_text.substring(0, 150) + '...' // Pinecone ensures chunk_text is in metadata
+            preview: chunk.chunk_text.substring(0, 150) + '...'
         }));
 
         res.json({
-            message: {
-                id: aiMsgId,
-                role: 'assistant',
-                content: aiResponse.content,
-                created_at: new Date().toISOString(),
-            },
+            message: aiMsg.rows[0],
             sources,
         });
 
@@ -185,13 +165,13 @@ router.post('/sessions/:sessionId/messages', authenticate, async (req, res) => {
 /**
  * DELETE /api/chat/sessions/:sessionId
  */
-router.delete('/sessions/:sessionId', authenticate, async (req, res) => {
+router.delete('/sessions/:sessionId', authenticateToken, async (req, res) => {
     try {
-        const [result] = await query(
-            'UPDATE chat_sessions SET is_active = FALSE, updated_at = NOW() WHERE id = ? AND user_id = ?',
+        const result = await pool.query(
+            'UPDATE chat_sessions SET is_active = FALSE, updated_at = NOW() WHERE id = $1 AND user_id = $2',
             [req.params.sessionId, req.user.id]
         );
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'Chat session not found.' });
+        if (result.rowCount === 0) return res.status(404).json({ error: 'Chat session not found.' });
         res.json({ message: 'Chat session deleted.' });
     } catch (error) {
         console.error('Delete session error:', error);

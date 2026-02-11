@@ -6,7 +6,7 @@
     "start": "node src/server.js",
     "dev:server": "node src/server.js",
     "dev:client": "cd client && npm run dev",
-    "setup": "node setup_mysql.js",
+    "setup": "node setup_postgres.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +16,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@pinecone-database/pinecone": "^7.0.0",
+    "@supabase/supabase-js": "^2.95.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.4",
@@ -23,8 +24,8 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
-    "mysql2": "^3.17.0",
     "pdf-parse": "^2.4.5",
+    "pg": "^8.18.0",
     "uuid": "^13.0.0"
   }
 }

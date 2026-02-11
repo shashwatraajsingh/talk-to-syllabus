@@ -2,9 +2,8 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
-const { query } = require('../config/database');
-const { authenticate } = require('../middleware/auth');
+const pool = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 const { processPDF } = require('../services/pdfProcessor');
 
 const router = express.Router();
@@ -32,21 +31,19 @@ const upload = multer({
 /**
  * POST /api/documents/upload
  */
-router.post('/upload', authenticate, upload.single('file'), async (req, res) => {
+router.post('/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No PDF file uploaded.' });
 
         const { title, description, courseName, courseCode, semester } = req.body;
         if (!title) return res.status(400).json({ error: 'Document title is required.' });
 
-        const docId = uuidv4();
-
-        await query(
+        const result = await pool.query(
             `INSERT INTO documents 
-       (id, uploaded_by, title, description, file_name, file_url, file_size_bytes, mime_type, course_name, course_code, semester)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (user_id, title, description, file_name, file_url, file_size_bytes, mime_type, course_name, course_code, semester)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
             [
-                docId,
                 req.user.id,
                 title,
                 description || null,
@@ -60,13 +57,11 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
             ]
         );
 
-        // Fetch created doc to return
-        const [rows] = await query('SELECT * FROM documents WHERE id = ?', [docId]);
-        const document = rows[0];
+        const document = result.rows[0];
 
         // Process PDF async
-        processPDF(docId, req.file.path).catch((err) => {
-            console.error(`Background PDF processing failed for ${docId}:`, err.message);
+        processPDF(document.id, req.file.path).catch((err) => {
+            console.error(`Background PDF processing failed for ${document.id}:`, err.message);
         });
 
         res.status(201).json({
@@ -88,23 +83,21 @@ router.post('/upload', authenticate, upload.single('file'), async (req, res) => 
 /**
  * GET /api/documents
  */
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
     try {
-        const [rows] = await query(
+        const result = await pool.query(
             `SELECT d.id, d.title, d.description, d.file_name, d.course_name, d.course_code, 
               d.semester, d.processing_status, d.total_chunks, d.page_count, d.created_at,
-              u.full_name as uploaded_by_name,
-              CASE WHEN d.uploaded_by = ? THEN 'owner' ELSE 'shared' END as access_type
+              CASE WHEN d.user_id = $1 THEN 'owner' ELSE 'shared' END as access_type
        FROM documents d
-       JOIN users u ON u.id = d.uploaded_by
        WHERE d.is_deleted = FALSE
-         AND (d.uploaded_by = ? OR d.id IN (
-           SELECT document_id FROM document_shares WHERE shared_with = ?
+         AND (d.user_id = $1 OR d.id IN (
+           SELECT document_id FROM document_shares WHERE shared_with = $1
          ))
        ORDER BY d.created_at DESC`,
-            [req.user.id, req.user.id, req.user.id]
+            [req.user.id]
         );
-        res.json({ documents: rows });
+        res.json({ documents: result.rows });
     } catch (error) {
         console.error('List documents error:', error);
         res.status(500).json({ error: 'Failed to fetch documents.' });
@@ -114,15 +107,15 @@ router.get('/', authenticate, async (req, res) => {
 /**
  * DELETE /api/documents/:id
  */
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
     try {
-        const [result] = await query(
+        const result = await pool.query(
             `UPDATE documents SET is_deleted = TRUE, updated_at = NOW()
-       WHERE id = ? AND uploaded_by = ? AND is_deleted = FALSE`,
+       WHERE id = $1 AND user_id = $2 AND is_deleted = FALSE`,
             [req.params.id, req.user.id]
         );
 
-        if (result.affectedRows === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Document not found or access denied.' });
         }
 
