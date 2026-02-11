@@ -41,7 +41,7 @@ async function retrieveRelevantChunks(queryText, documentId = null, limit = 5) {
  * (Unchanged logic, just updated imports/flow if needed)
  */
 async function generateRAGResponse(userQuery, retrievedChunks, chatHistory = []) {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Build context from retrieved chunks
     const contextParts = retrievedChunks.map((chunk, i) => {
@@ -80,7 +80,7 @@ ${context}`;
 
     return {
         content: response.text(),
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         promptTokens: usage?.promptTokenCount || 0,
         completionTokens: usage?.candidatesTokenCount || 0,
         totalTokens: usage?.totalTokenCount || 0,

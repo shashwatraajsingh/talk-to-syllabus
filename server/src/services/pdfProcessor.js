@@ -48,11 +48,16 @@ async function processPDF(documentId, filePath) {
             }
         }));
 
+        console.log(`📦 Prepared ${vectors.length} vectors for Pinecone`);
+
         // Batch upsert to Pinecone
         const batchSize = 100;
         for (let i = 0; i < vectors.length; i += batchSize) {
             const batch = vectors.slice(i, i + batchSize);
-            await upsertVectors(batch);
+            if (batch.length > 0) {
+                console.log(`  Upserting batch ${Math.floor(i / batchSize) + 1}: ${batch.length} vectors`);
+                await upsertVectors(batch);
+            }
         }
 
         // Update document status
