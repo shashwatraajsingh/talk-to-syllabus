@@ -26,6 +26,7 @@ export default function ChatView({
 }) {
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
+    const [btechYear, setBtechYear] = useState('1'); // BTech year selector
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
 
@@ -236,6 +237,26 @@ export default function ChatView({
             {/* Input */}
             <div className="input-area">
                 <div className="input-wrapper">
+                    {/* BTech Year Selector */}
+                    <div className="year-selector">
+                        <span className="year-selector-label">
+                            <GraduationCap size={16} />
+                            BTech Year:
+                        </span>
+                        <div className="year-selector-options">
+                            {['1', '2', '3', '4'].map(year => (
+                                <button
+                                    key={year}
+                                    className={`year-option ${btechYear === year ? 'active' : ''}`}
+                                    onClick={() => setBtechYear(year)}
+                                    aria-label={`Select year ${year}`}
+                                >
+                                    {year}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="input-container">
                         <textarea
                             ref={textareaRef}
