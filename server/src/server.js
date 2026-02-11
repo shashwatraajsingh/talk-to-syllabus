@@ -4,6 +4,13 @@ const helmet = require('helmet');
 const path = require('path');
 require('dotenv').config();
 
+console.log('🔧 Starting server initialization...');
+console.log('   PORT:', process.env.PORT || 3000);
+console.log('   NODE_ENV:', process.env.NODE_ENV || 'development');
+console.log('   DATABASE_URL:', process.env.DATABASE_URL ? '✅ Set' : '❌ Missing');
+console.log('   GEMINI_API_KEY:', process.env.GEMINI_API_KEY ? '✅ Set' : '❌ Missing');
+console.log('   SUPABASE_URL:', process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing');
+
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const chatRoutes = require('./routes/chat');
@@ -41,8 +48,8 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error.' });
 });
 
-app.listen(PORT, () => {
-    console.log(`\n🎓 Talk-to-Syllabus server running on http://localhost:${PORT}\n`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🎓 Talk-to-Syllabus server running on http://0.0.0.0:${PORT}\n`);
 });
 
 module.exports = app;

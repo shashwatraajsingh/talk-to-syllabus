@@ -6,7 +6,10 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false // Required for Supabase
-    }
+    },
+    connectionTimeoutMillis: 10000, // 10s timeout
+    idleTimeoutMillis: 30000,
+    max: 10,
 });
 
 // Test connection
@@ -15,8 +18,8 @@ pool.on('connect', () => {
 });
 
 pool.on('error', (err) => {
-    console.error('❌ Unexpected PostgreSQL error:', err);
-    process.exit(-1);
+    console.error('❌ PostgreSQL pool error:', err.message);
+    // Don't crash the server - just log the error
 });
 
 module.exports = pool;
