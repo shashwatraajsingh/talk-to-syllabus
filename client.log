@@ -1,0 +1,29 @@
+nohup: ignoring input
+
+> talk-to-syllabus@1.0.0 dev:client
+> cd client && npm run dev
+
+
+> client@0.0.0 dev
+> vite
+
+
+  VITE v7.3.1  ready in 197 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+11:08:22 AM [vite] http proxy error: /api/auth/register
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+11:57:21 AM [vite] (client) hmr update /src/index.css
+11:58:58 AM [vite] (client) hmr update /src/components/ChatView.jsx
+12:00:38 PM [vite] (client) hmr update /src/index.css
+12:02:02 PM [vite] (client) hmr update /src/index.css
+12:05:02 PM [vite] (client) hmr update /src/components/ChatView.jsx
+12:05:02 PM [vite] (client) hmr update /src/index.css
+12:08:07 PM [vite] (client) hmr update /src/index.css
+12:09:56 PM [vite] http proxy error: /api/auth/register
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
