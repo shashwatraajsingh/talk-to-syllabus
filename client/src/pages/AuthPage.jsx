@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import { GraduationCap, Mail, Lock, User } from 'lucide-react';
 
 export default function AuthPage() {
     const { signIn, signUp } = useAuth();
-    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -30,7 +28,7 @@ export default function AuthPage() {
             if (isLogin) {
                 const { error } = await signIn(form.email, form.password);
                 if (error) throw error;
-                navigate('/');
+                // No navigate needed - App.jsx handles redirect via user state
             } else {
                 const { error } = await signUp(form.email, form.password, {
                     full_name: form.fullName,

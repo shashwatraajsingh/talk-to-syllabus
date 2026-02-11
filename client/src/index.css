@@ -1139,6 +1139,106 @@ textarea {
   box-shadow: var(--shadow-lg);
 }
 
+/* ── Welcome Modal ── */
+.welcome-modal {
+  background: linear-gradient(135deg, rgba(30, 33, 64, 0.95), rgba(20, 23, 40, 0.95));
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  width: 90%;
+  max-width: 480px;
+  animation: scaleIn 0.3s ease-out;
+  box-shadow: 0 20px 60px rgba(124, 58, 237, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  text-align: center;
+}
+
+.welcome-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--space-lg);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 0 30px rgba(124, 58, 237, 0.5);
+  animation: float 3s ease-in-out infinite;
+}
+
+.welcome-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--primary-light), var(--cta));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: var(--space-lg);
+}
+
+.welcome-content {
+  margin-bottom: var(--space-xl);
+}
+
+.welcome-message {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-md);
+}
+
+.welcome-topic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: var(--radius-lg);
+  margin: var(--space-lg) 0;
+  text-align: left;
+}
+
+.welcome-topic svg {
+  color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.welcome-topic strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.welcome-subtitle {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.welcome-footer {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: var(--space-md);
+}
+
+.welcome-btn {
+  width: 100%;
+  padding: var(--space-md) var(--space-xl);
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  font-size: 0.95rem;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+}
+
+.welcome-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(124, 58, 237, 0.5);
+}
+
+
 .modal-header {
   display: flex;
   align-items: center;

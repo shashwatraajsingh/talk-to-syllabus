@@ -27,8 +27,16 @@ export default function ChatView({
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [btechYear, setBtechYear] = useState('1'); // BTech year selector
+    const [showWelcome, setShowWelcome] = useState(false); // Welcome popup
     const messagesEndRef = useRef(null);
     const textareaRef = useRef(null);
+
+    // Show welcome popup for new sessions
+    useEffect(() => {
+        if (session && messages.length === 0) {
+            setShowWelcome(true);
+        }
+    }, [session, messages]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -285,6 +293,37 @@ export default function ChatView({
                     </div>
                 </div>
             </div>
+
+            {/* Welcome Popup */}
+            {showWelcome && (
+                <div className="modal-overlay" onClick={() => setShowWelcome(false)}>
+                    <div className="welcome-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="welcome-icon">
+                            <Sparkles size={32} />
+                        </div>
+                        <h2 className="welcome-title">Welcome to Talk-to-Syllabus! 🎓</h2>
+                        <div className="welcome-content">
+                            <p className="welcome-message">
+                                For now, please ask questions about:
+                            </p>
+                            <div className="welcome-topic">
+                                <BookOpen size={20} />
+                                <div>
+                                    <strong>Unit-1: Cyber Security</strong>
+                                    <br />
+                                    <span className="welcome-subtitle">Introduction to Cybercrime</span>
+                                </div>
+                            </div>
+                            <p className="welcome-footer">
+                                📚 More units and topics coming soon!
+                            </p>
+                        </div>
+                        <button className="welcome-btn" onClick={() => setShowWelcome(false)}>
+                            Got it, Let's Start!
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
