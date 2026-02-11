@@ -1,67 +1,85 @@
-/* src/services/rag.js REFRACTORED FOR MYSQL + PINECONE */
+/* src/services/rag.js - Direct PDF context + Gemini 2.5 Flash */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { queryVectors } = require('./pinecone');
-const { generateEmbedding } = require('./embedding');
+const fs = require('fs');
+const path = require('path');
+const pdfParse = require('pdf-parse');
 require('dotenv').config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-/**
- * Search for the most relevant document chunks using Pinecone vector similarity.
- */
-async function retrieveRelevantChunks(queryText, documentId = null, limit = 5) {
-    // Generate embedding for the user's query
-    const queryEmbedding = await generateEmbedding(queryText);
+// Cache the PDF text in memory so we don't re-read it every time
+let cachedPdfText = null;
 
-    // Build filter for Pinecone
-    const filter = {};
-    if (documentId) {
-        filter.document_id = { $eq: documentId };
+/**
+ * Load the default PDF text (Unit 1 Cyber Security)
+ */
+async function loadDefaultPdfText() {
+    if (cachedPdfText) return cachedPdfText;
+
+    const pdfPath = path.join(__dirname, '..', 'unit 1_PPT.pdf');
+
+    if (!fs.existsSync(pdfPath)) {
+        console.warn('⚠️  Default PDF not found at:', pdfPath);
+        return '';
     }
 
-    // Query Pinecone
-    const matches = await queryVectors(queryEmbedding, filter, limit);
-
-    // Map Pinecone results to a cleaner format
-    return matches.map((match) => ({
-        id: match.id,
-        similarity: match.score,
-        chunk_text: match.metadata.text,
-        page_number: match.metadata.page_number,
-        document_title: match.metadata.document_title,
-        course_name: match.metadata.course_name,
-        chunk_index: match.metadata.chunk_index,
-        metadata: match.metadata,
-    }));
+    try {
+        const dataBuffer = fs.readFileSync(pdfPath);
+        const data = await pdfParse(dataBuffer);
+        cachedPdfText = data.text;
+        console.log(`📄 Loaded PDF: ${data.numpages} pages, ${cachedPdfText.length} chars`);
+        return cachedPdfText;
+    } catch (error) {
+        console.error('❌ Failed to load PDF:', error.message);
+        return '';
+    }
 }
 
 /**
- * Generate an AI response using retrieved context (Generation).
- * (Unchanged logic, just updated imports/flow if needed)
+ * Retrieve relevant context - uses the default PDF directly
+ * No Pinecone needed!
+ */
+async function retrieveRelevantChunks(queryText, documentId = null, limit = 5) {
+    const pdfText = await loadDefaultPdfText();
+
+    // Return the full PDF text as a single chunk since it's small
+    return [{
+        id: 'unit1-cybersecurity',
+        similarity: 1.0,
+        chunk_text: pdfText,
+        page_number: null,
+        document_title: 'Unit 1: Introduction to Cybercrime',
+        course_name: 'Cyber Security (BCC-301/BCC-401)',
+        chunk_index: 0,
+        metadata: {}
+    }];
+}
+
+/**
+ * Generate an AI response using Gemini 2.5 Flash with the PDF context
  */
 async function generateRAGResponse(userQuery, retrievedChunks, chatHistory = []) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-    // Build context from retrieved chunks
-    const contextParts = retrievedChunks.map((chunk, i) => {
-        const source = chunk.document_title || 'Unknown Document';
-        const page = chunk.page_number ? ` (Page ${chunk.page_number})` : '';
-        return `[Source ${i + 1}: ${source}${page}]\n${chunk.chunk_text}`;
-    });
+    // Build context from PDF text
+    const context = retrievedChunks.map(chunk => chunk.chunk_text).join('\n\n');
 
-    const context = contextParts.join('\n\n---\n\n');
+    const systemPrompt = `You are "Talk-to-Syllabus", an intelligent academic assistant for BTech students.
+You specialize in answering questions about Cyber Security - Unit 1: Introduction to Cybercrime.
 
-    const systemPrompt = `You are "Talk-to-Syllabus", an intelligent academic assistant. 
-Answer questions ONLY based on the provided syllabus context below. 
-If the answer is not found, say so. 
-Cite sources/pages when possible.
+Answer questions based on the provided syllabus content below. Be thorough, clear, and educational.
+If the content doesn't cover a topic, say so politely and stick to what's available.
+Use markdown formatting for better readability.
+Include relevant examples when helpful.
 
-CONTEXT:
-${context}`;
+SYLLABUS CONTENT:
+${context}
+
+IMPORTANT: This is from AKTU BTech syllabus, course codes BCC-301 (3rd Sem) / BCC-401 (4th Sem).`;
 
     const contents = [];
-    for (const msg of chatHistory) {
+    for (const msg of chatHistory.slice(-8)) {
         contents.push({
             role: msg.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: msg.content }],
@@ -72,7 +90,7 @@ ${context}`;
     const result = await model.generateContent({
         contents,
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+        generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
     });
 
     const response = result.response;
